@@ -1,52 +1,20 @@
-<# 
-For more information, see: 
-https://documentation.red-gate.com/redgate-clone/using-the-cli/cli-installation
-#>
+# Define the path to the script you want to run
+$scriptPath = "C:\git\InstallTdmClisOnWindows\InstallTdmClisOnWindows.ps1"
 
-$rgCloneEndpoint = $env:RGCLONE_API_ENDPOINT
-if ($rgCloneEndpoint -notlike "http*/"){
-    Write-Error "RGCLONE_API_ENDPOINT variable is either not set, or not in correct format"
-} 
-$rgcloneExe = (Get-Command rgclone).Source
-$rgcloneLocation = Split-Path -parent $rgcloneExe
-
-Write-Output "  "
-Write-Output " UPDATING rgclone.exe"
-Write-Output "  "
-
-$downloadUrl = $rgCloneEndpoint + "cloning-api/download/cli/windows-amd64"
-$zipFile = Join-Path -Path $rgCloneLocation -ChildPath "rgclone.zip"
-Write-Output "Install parameters:"
-Write-Output "  Redgate Clone endpoint is:  $rgCloneEndpoint"
-Write-Output "  Download URL is:            $downloadUrl"
-Write-Output "  rgclone.exe install dir is: $rgCloneLocation"
-Write-Output "  rgclone.exe zip file is:    $zipFile"
-Write-Output "  "
-
-Write-Output "  "
-Write-Output "Performing installation:"
-
-If (Test-Path $rgcloneExe){
-    Write-Output "  Deleting existing rgclone.exe." 
-    Remove-Item $rgcloneExe -Force -Recurse | Out-Null
+# Check if the script file exists
+if (Test-Path -Path $scriptPath) {
+    Write-Host "Executing script: $scriptPath"
+    
+    try {
+        # Run the script
+        . $scriptPath
+        Write-Host "Script executed successfully."
+    }
+    catch {
+        Write-Host "Error executing script."
+        Write-Host "Error details: $_"
+    }
 }
-
-
-If (Test-Path $zipFile){
-    Write-Output "  Deleting existing rgclone zip file." 
-    Remove-Item $zipFile -Force -Recurse | Out-Null
+else {
+    Write-Host "Script file not found: $scriptPath"
 }
-
-Write-Output "  Downloading rgclone.exe zip file..."
-Write-Output "    from: $downloadUrl"
-Write-Output "    to:   $zipFile"
-Invoke-WebRequest -Uri $downloadUrl -OutFile $zipFile
-
-Write-Output "  Extracting zip to: $rgCloneLocation"
-Add-Type -assembly "System.IO.Compression.Filesystem";
-[IO.Compression.Zipfile]::ExtractToDirectory($zipFile, $rgCloneLocation);
-
-Write-Output ""
-Write-Output "INSTALL COMPLETE!"
-Write-Output "Your files are saved at:"
-Write-Output "  $rgCloneLocation"
