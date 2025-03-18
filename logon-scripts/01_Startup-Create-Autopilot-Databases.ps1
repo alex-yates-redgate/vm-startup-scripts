@@ -21,10 +21,10 @@ $LogPath = "C:\Temp\SQLStartup.log"
 # Define the default SQL Server instance (localhost)
 $SQLInstance = "localhost"
 
-if ($env:VM_CONFIG = 'CustomerVM') {
+if ($env:VM_CONFIG -eq 'CustomerVM') {
     Write-Host "Template VM '$env:VM_CONFIG' Detected - Exiting Gracefully"
     exit 0
-} if ($env:VM_CONFIG = 'SalesDemo') {
+} if ($env:VM_CONFIG -eq 'SalesDemo') {
     Write-Host "Template VM '$env:VM_CONFIG' Detected - Running Autopilot Database Creation Process"
 }
 else {
