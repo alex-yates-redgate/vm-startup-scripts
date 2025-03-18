@@ -1,3 +1,15 @@
+# ===========================
+# Script Name: 01_Startup-Create-Autopilot-Databases.ps1
+# Version: 1.0.0
+# Author: Chris Hawkins (Redgate Software Ltd)
+# Last Updated: 2025-03-18
+# Description: Automatically create Autopilot databases on SalesDemoVM startup
+# ===========================
+
+$ScriptVersion = "1.0.0"
+
+Write-Host "Running Autopilot Startup Database Creation Script - Version $ScriptVersion"
+
 $ErrorActionPreference = "Stop"
 
 # Define SQL script path
