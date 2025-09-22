@@ -1,5 +1,5 @@
 # Define the path to the script you want to run
-$scriptPath = "C:\git\Demos\TDM-AutoPilot\helper_scripts\InstallTdmClisOnWindows.ps1"
+$scriptPath = "C:\git\Demos\TDM-AutoPilot\Setup_Files\InstallTdmClis.ps1"
 
 # Check if the script file exists
 if (Test-Path -Path $scriptPath) {
