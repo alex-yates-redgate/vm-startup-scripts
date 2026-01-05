@@ -53,6 +53,7 @@ Write-Host "Checking license files..."
 
 Remove-FileSafely "C:\Program Files\Red Gate\Permits\permit.dat"
 Remove-FileSafely "C:\Users\redgate\AppData\Roaming\Redgate\Flyway Desktop\permit.offline.jwt"
+Remove-FileSafely "C:\Users\redgate\AppData\Roaming\Redgate\Flyway Desktop\permit.jwt"
 
 Write-Host ""
 Write-Host "Task completed."
