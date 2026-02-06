@@ -2,8 +2,8 @@
 title VM Startup Scripts
 color 0a
 
-REM Disable QuickEdit mode to prevent console from pausing when clicked
-reg add HKCU\Console /v QuickEdit /t REG_DWORD /d 0 /f >nul 2>&1
+REM Disable QuickEdit mode for THIS console session to prevent freezing when clicked
+powershell -NoProfile -Command "$m='[DllImport(\"kernel32.dll\")]static extern IntPtr GetStdHandle(int n);[DllImport(\"kernel32.dll\")]static extern bool GetConsoleMode(IntPtr h,out uint m);[DllImport(\"kernel32.dll\")]static extern bool SetConsoleMode(IntPtr h,uint m);public static void Disable(){var h=GetStdHandle(-10);uint m;GetConsoleMode(h,out m);m&=~0x0040;m&=~0x0020;SetConsoleMode(h,m);}';Add-Type -M $m -N C -Name M;[C.M]::Disable();" 2>nul
 
 echo.
 echo ===============================
