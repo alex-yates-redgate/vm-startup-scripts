@@ -35,8 +35,8 @@ else {
 # ==========================================================
 
 $SqlInstances = @(
-    @{ Name = "MSSQLSERVER"; Display = "SQL Server (MSSQLSERVER)" },
-    @{ Name = "MSSQL`$TOOLS"; Display = "SQL Server (TOOLS)" }
+    @{ Name = "MSSQL`$TOOLS"; Display = "SQL Server (TOOLS)" },
+    @{ Name = "MSSQLSERVER"; Display = "SQL Server (MSSQLSERVER)" }
 )
 
 $RetryCount         = 3
@@ -156,8 +156,8 @@ function Parse-SqlErrorLog {
     param([string]$Instance, [int]$LookbackMinutes = 30)
     Write-Status "Parsing SQL error log for ${Instance}..." Yellow
     $query = @"
-EXEC xp_readerrorlog 0, 1, N'recovery', NULL,
-     DATEADD(MINUTE,-$LookbackMinutes,GETDATE()), GETDATE(), N'desc'
+DECLARE @StartTime DATETIME = DATEADD(MINUTE, -$LookbackMinutes, GETDATE());
+EXEC xp_readerrorlog 0, 1, N'recovery', NULL, @StartTime, NULL, N'desc'
 "@
     try {
         $rows = Invoke-Sqlcmd -ServerInstance $Instance -Query $query -QueryTimeout 30
@@ -167,7 +167,11 @@ EXEC xp_readerrorlog 0, 1, N'recovery', NULL,
 
 # Returns an object describing health and whether we restarted due to recovery pending
 function Validate-SqlInstance {
-    param([string]$ServiceName, [string]$SqlInstance)
+    param(
+        [string]$ServiceName, 
+        [string]$SqlInstance,
+        [bool]$IsToolsInstance = $false
+    )
 
     $attempt = 0
     $restartedDueToRecovery = $false
@@ -190,11 +194,37 @@ function Validate-SqlInstance {
                 foreach ($db in $pending) { Write-Status " - $($db.name)" Red }
                 Parse-SqlErrorLog -Instance $SqlInstance -LookbackMinutes $LogLookbackMinutes
 
-                Write-Status "Restarting service ${ServiceName} to clear recovery pending..." Yellow
-                Restart-Service -Name $ServiceName -Force -ErrorAction SilentlyContinue
+                if ($IsToolsInstance) {
+                    # TOOLS: Restart SQL instance first, then SQL Clone services
+                    Write-Status "Restarting TOOLS instance first..." Yellow
+                    Restart-Service -Name $ServiceName -Force -ErrorAction SilentlyContinue
+                    Start-Sleep -Seconds 20
+                    
+                    Write-Status "Restarting SQL Clone Server..." Yellow
+                    Ensure-ServiceRestart -Name $SqlCloneServerService
+                    Start-Sleep -Seconds 5
+                    
+                    Write-Status "Restarting SQL Clone Agent..." Yellow
+                    Restart-LatestSqlCloneAgent
+                    Start-Sleep -Seconds 5
+                }
+                else {
+                    # MSSQLSERVER: Restart SQL Clone services first, then SQL instance
+                    Write-Status "Restarting SQL Clone Server first..." Yellow
+                    Ensure-ServiceRestart -Name $SqlCloneServerService
+                    Start-Sleep -Seconds 5
+                    
+                    Write-Status "Restarting SQL Clone Agent..." Yellow
+                    Restart-LatestSqlCloneAgent
+                    Start-Sleep -Seconds 5
+                    
+                    Write-Status "Restarting MSSQLSERVER instance..." Yellow
+                    Restart-Service -Name $ServiceName -Force -ErrorAction SilentlyContinue
+                    Start-Sleep -Seconds 20
+                }
+                
                 $restartedDueToRecovery = $true
                 $restartedAny = $true
-                Start-Sleep -Seconds 20
             }
             else {
                 Write-Status "SQL instance ${SqlInstance} healthy." Green
@@ -254,26 +284,26 @@ function Restart-LatestSqlCloneAgent {
 }
 
 # ==========================================================
-# MAIN ORCHESTRATION SEQUENCE (Option B: MSSQLSERVER then MSSQL$TOOLS)
+# MAIN ORCHESTRATION SEQUENCE (TOOLS first, then MSSQLSERVER)
 # ==========================================================
 Write-Status "===== DEMO STARTUP SEQUENCE BEGIN =====" Cyan
 
-# 1) MSSQLSERVER first
-$primaryResult = Validate-SqlInstance -ServiceName "MSSQLSERVER"  -SqlInstance "localhost"
+# 1) MSSQL$TOOLS first - MUST be healthy with no recovery pending DBs before proceeding
+Write-Status "Step 1: Validating TOOLS instance (must be healthy before main instance)" Cyan
+$toolsResult = Validate-SqlInstance -ServiceName "MSSQL`$TOOLS" -SqlInstance "localhost\TOOLS" -IsToolsInstance $true
 
-# 2) Then MSSQL$TOOLS (track if it was restarted due to RECOVERY_PENDING)
-$toolsResult   = Validate-SqlInstance -ServiceName "MSSQL`$TOOLS" -SqlInstance "localhost\TOOLS"
+# 2) Then MSSQLSERVER
+Write-Status "Step 2: Validating primary MSSQLSERVER instance" Cyan
+$primaryResult = Validate-SqlInstance -ServiceName "MSSQLSERVER" -SqlInstance "localhost" -IsToolsInstance $false
 
-# 3) SQL Clone Server and Agent handling based on TOOLS recovery
-if ($toolsResult.RestartedDueToRecoveryPending) {
-    Write-Status "TOOLS was restarted due to RECOVERY_PENDING. Restarting SQL Clone components..." Yellow
-    Ensure-ServiceRestart -Name $SqlCloneServerService
-    Restart-LatestSqlCloneAgent
-}
-else {
-    # Normal path: ensure Clone Server is running, and start/ensure Agent
+# 3) Ensure SQL Clone services are running (if not already restarted due to recovery)
+if (-not $toolsResult.RestartedDueToRecoveryPending -and -not $primaryResult.RestartedDueToRecoveryPending) {
+    Write-Status "No recovery issues detected. Ensuring SQL Clone services are running..." Cyan
     Ensure-ServiceRunning -Name $SqlCloneServerService
     Start-LatestSqlCloneAgent
+}
+else {
+    Write-Status "SQL Clone services already handled during recovery restart sequence." Green
 }
 
 # 4) ChinookBackend (Option A)
