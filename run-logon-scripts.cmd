@@ -2,6 +2,9 @@
 title VM Startup Scripts
 color 0a
 
+REM Disable QuickEdit mode to prevent console from pausing when clicked
+reg add HKCU\Console /v QuickEdit /t REG_DWORD /d 0 /f >nul 2>&1
+
 echo.
 echo ===============================
 echo SCRIPT STARTED
